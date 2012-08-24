@@ -1,0 +1,65 @@
+tell application id "com.apple.dt.Xcode"
+	activate
+	set my_work_space to active workspace document
+	set my_projects to projects of my_work_space
+	set my_project to item 1 of my_projects
+	set my_windows to windows
+	set my_window to item 1 of my_windows
+	set window_name to name of my_window
+	-- window_name is typically "ProjectName - FileName.m"
+	-- The following is very fragile and ugly…
+	tell me
+		set my_names to split(window_name, " — ")
+	end tell
+	set target_file_name to item 2 of my_names
+	
+end tell
+
+to split(aString, delimiter)
+	set oldastid to AppleScript's text item delimiters
+	set AppleScript's text item delimiters to delimiter
+	set pieces to aString's text items
+	set AppleScript's text item delimiters to oldastid
+	return pieces
+end split
+
+set selectedapp to "Xcode" as string
+tell application id "com.apple.dt.Xcode"
+	activate
+	tell application "System Events"
+		tell process selectedapp
+			keystroke "c" using command down
+			delay 2
+			set select_text to the clipboard as text
+		end tell
+	end tell
+end tell
+
+to replace_chars(this_text, search_string, replacement_string)
+	set AppleScript's text item delimiters to the search_string
+	set the item_list to every text item of this_text
+	set AppleScript's text item delimiters to the replacement_string
+	set this_text to the item_list as string
+	set AppleScript's text item delimiters to ""
+	return this_text
+end replace_chars
+
+set select_text to replace_chars(select_text, "\"", "\\\"")
+set select_text to replace_chars(select_text, "'", "\\'")
+
+
+tell application id "com.apple.dt.Xcode"
+	repeat with current_document in (source documents)
+		set current_document_path to path of current_document
+		if current_document_path contains target_file_name then
+			exit repeat
+		end if
+	end repeat
+end tell
+
+set a to "<find_version.rb_absolute_path>  -c \"<p4_client_pattern>" -f "
+set b to " -t \""
+set c to "\" -p -v -d"
+set command to "/bin/bash -c 'export P4PORT=<perforce_port>; export P4USER=<perforce_user>;export P4DIFF=<perforce_diff_tool>;" & a & current_document_path & b & select_text & c & " >& /tmp/find_version_xcode.txt; open /tmp/find_version_xcode.txt'"
+#display dialog command
+do shell script command
